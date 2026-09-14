@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Jobright Bot",
+  "version": "1.0.0",
+  "description": "Skips companies you've already applied to, clicks Apply with Autofill for new ones, returns to Jobright and confirms.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["https://jobright.ai/*", "https://*.supabase.co/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://jobright.ai/*"],
+      "js": ["shared.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "Jobright Bot" },
+  "options_page": "options.html"
+}

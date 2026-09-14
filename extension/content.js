@@ -1,0 +1,273 @@
+// Runs inside jobright.ai. Reads job cards, clicks Apply, waits for the
+// external tab (background refocuses Jobright) and the "Did you apply?"
+// modal, clicks "Yes, I applied!", records the company. Same rules as the
+// Node bot: a company is saved ONLY after that confirmation click succeeds.
+
+/* ------------------------------------------------------------------ */
+/* Selectors (confirmed against Jobright's DOM, 2026-09-13)            */
+/* ------------------------------------------------------------------ */
+
+const SEL = {
+  jobCard: 'div[id][class*="index_job-card__"]',
+  jobTitle: '[class*="index_job-title__"]',
+  companyName: '[class*="index_company-name__"]',
+  applyButton: 'button[class*="index_apply-button__"]',
+  applyWithAutofillText: /apply with autofill/i,
+  applyNowText: /^apply now$/i,
+  yesAppliedText: /yes,?\s*i applied/i,
+  dismissTexts: [/^maybe later$/i, /^not now$/i, /^skip$/i, /^later$/i],
+  modal: ".ant-modal, [role=dialog]",
+  jobListScroller: '[class*="jobs-list-scrollable"]',
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const text = (el) => (el ? el.textContent || "" : "").replace(/\s+/g, " ").trim();
+const isVisible = (el) => !!el && el.offsetParent !== null && el.getClientRects().length > 0;
+
+function buttonsMatching(re) {
+  return [...document.querySelectorAll("button, [role=button]")].filter((b) => isVisible(b) && re.test(text(b)));
+}
+
+/* ------------------------------------------------------------------ */
+/* Reading the list                                                    */
+/* ------------------------------------------------------------------ */
+
+function getJobCards() {
+  return [...document.querySelectorAll(SEL.jobCard)];
+}
+
+function readJobCard(card) {
+  const company = text(card.querySelector(SEL.companyName));
+  const title = text(card.querySelector(SEL.jobTitle));
+  if (!company) return null;
+  const btn = card.querySelector(SEL.applyButton);
+  const btnText = text(btn);
+  const applyKind = SEL.applyWithAutofillText.test(btnText)
+    ? "autofill"
+    : SEL.applyNowText.test(btnText)
+      ? "apply-now"
+      : "none";
+  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn };
+}
+
+function scrollJobList() {
+  const scroller = document.querySelector(SEL.jobListScroller);
+  if (scroller) scroller.scrollBy(0, scroller.clientHeight * 2);
+  else window.scrollBy(0, 2000);
+}
+
+/* ------------------------------------------------------------------ */
+/* Modals                                                              */
+/* ------------------------------------------------------------------ */
+
+function findYesAppliedButton() {
+  return buttonsMatching(SEL.yesAppliedText)[0] || null;
+}
+
+async function dismissNagModals() {
+  let dismissed = false;
+  for (const re of SEL.dismissTexts) {
+    const btn = buttonsMatching(re)[0];
+    if (btn) {
+      btn.click();
+      await log.info(`Dismissed modal via "${text(btn)}"`);
+      dismissed = true;
+      await sleep(400);
+    }
+  }
+  return dismissed;
+}
+
+function describeOpenModals() {
+  return [...document.querySelectorAll(SEL.modal)].filter(isVisible).map((m) => text(m).slice(0, 300));
+}
+
+async function logFailureDiagnostics() {
+  const modals = describeOpenModals();
+  await log.warn(`Diagnostics: open modals: ${modals.length ? JSON.stringify(modals) : "none"}`);
+  if (modals.some((t) => /extension/i.test(t))) {
+    await log.warn('A modal mentions "extension" - the Jobright Autofill extension is probably not installed in this browser profile.');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Background helpers (tabs API lives there)                           */
+/* ------------------------------------------------------------------ */
+
+const bg = (msg) => chrome.runtime.sendMessage(msg).catch(() => null);
+
+/* ------------------------------------------------------------------ */
+/* Per-job state machine                                               */
+/* ------------------------------------------------------------------ */
+
+let running = false;
+let stopRequested = false;
+
+async function processJob(job, settings, stats) {
+  await log.info(`Job found: ${job.title} | Company: ${job.company}`);
+
+  // CHECK_COMPANY
+  if (await hasApplied(job.company)) {
+    await log.info("Company already applied -> SKIP");
+    return "skipped";
+  }
+  await log.info("Company is new");
+
+  if (job.applyKind === "apply-now" && settings.applyNowBehavior === "skip") {
+    await log.warn(`Card shows "APPLY NOW" (no autofill) for ${job.company} -> SKIP (applyNowBehavior=skip)`);
+    return "no-autofill";
+  }
+  if (job.applyKind === "none" || !job.button) {
+    await log.error(`Apply button not found for ${job.company} -> SKIP`);
+    return "failed";
+  }
+  job.button.scrollIntoView({ block: "center" });
+
+  if (settings.dryRun) {
+    await log.dry(`Company: ${job.company} | Status: NEW | Action: WOULD CLICK APPLY`);
+    return "dry-run";
+  }
+
+  // CLICK_APPLY -> race: new tab (background refocuses us) / "Did you apply?"
+  await dismissNagModals();
+  await log.info(job.applyKind === "autofill" ? "Clicking Apply with Autofill" : "Clicking APPLY NOW");
+  await bg({ type: "arm" });
+  let externalTab = null;
+  let yesButton = null;
+  try {
+    job.button.click();
+    const deadline = Date.now() + settings.newTabTimeout + settings.confirmationTimeout;
+    while (Date.now() < deadline && !stopRequested) {
+      if (!externalTab) {
+        const res = await bg({ type: "check" });
+        if (res && res.newTabs && res.newTabs.length) {
+          externalTab = res.newTabs[0];
+          stats.externalTabs++;
+          await log.info(`New tab detected (${stats.externalTabs} external tab(s) open): ${externalTab.url || "(loading)"}`);
+          await log.info("Returning to Jobright");
+        }
+      }
+      yesButton = findYesAppliedButton();
+      if (yesButton) break;
+      await dismissNagModals();
+      await sleep(300);
+    }
+  } finally {
+    await bg({ type: "disarm" });
+  }
+
+  if (!yesButton) {
+    await log.error(
+      externalTab
+        ? `Confirmation modal did not appear for ${job.company} - NOT marking as applied`
+        : `Neither a new tab nor "Did you apply?" appeared for ${job.company} - NOT marking as applied`,
+    );
+    await logFailureDiagnostics();
+    if (!externalTab && settings.onNewTabTimeout === "stop") throw new Error("Stopping per onNewTabTimeout=stop");
+    return "failed";
+  }
+  if (!externalTab) await log.warn("Confirmation modal appeared but no new tab was detected - proceeding on the modal");
+  await log.info("Confirmation modal detected");
+
+  // CLICK_YES_APPLIED
+  await log.info('Clicking "Yes, I applied!"');
+  yesButton.click();
+  await sleep(500);
+
+  // SAVE_COMPANY - only reached after the confirmation click.
+  const added = await addToHistory([job.company], "bot");
+  await log.info(added ? `${job.company} added to applied-company history` : `${job.company} was already in history (no duplicate created)`);
+  return "applied";
+}
+
+/* ------------------------------------------------------------------ */
+/* Main loop                                                           */
+/* ------------------------------------------------------------------ */
+
+async function runBot() {
+  if (running) return;
+  running = true;
+  stopRequested = false;
+  const settings = await getSettings();
+  const stats = { applied: 0, skipped: 0, failed: 0, dryRun: 0, noAutofill: 0, unreadable: 0, externalTabs: 0 };
+  const seen = new Set();
+  let scrollRounds = 0;
+  const historyCount = Object.keys(await getHistory()).length;
+
+  await setStatus({ running: true, stats, current: "" });
+  await log.info(`Mode: ${settings.dryRun ? "DRY RUN (no clicks)" : "LIVE"} | history has ${historyCount} companies | max applies this run: ${settings.maxApplicationsPerRun}`);
+
+  try {
+    outer: while (!stopRequested) {
+      await dismissNagModals();
+      const cards = getJobCards();
+      let newCardsThisPass = 0;
+
+      for (const card of cards) {
+        if (stopRequested) break outer;
+        if (stats.applied >= settings.maxApplicationsPerRun) {
+          await log.info(`Reached max applications per run (${settings.maxApplicationsPerRun}) - stopping`);
+          break outer;
+        }
+        const job = readJobCard(card);
+        if (!job) {
+          stats.unreadable++;
+          await log.error("Company name could not be extracted from job card -> SKIP (no Apply click)");
+          continue;
+        }
+        if (seen.has(job.id)) continue;
+        seen.add(job.id);
+        newCardsThisPass++;
+        await setStatus({ stats, current: `${job.title} | ${job.company}` });
+
+        const outcome = await processJob(job, settings, stats);
+        if (outcome === "skipped") stats.skipped++;
+        else if (outcome === "applied") stats.applied++;
+        else if (outcome === "failed") stats.failed++;
+        else if (outcome === "no-autofill") stats.noAutofill++;
+        else stats.dryRun++;
+        await setStatus({ stats });
+
+        await bg({ type: "focusJobright" }); // AC-08: always operate from Jobright
+        await sleep(settings.delayBetweenJobs);
+      }
+
+      if (newCardsThisPass === 0) {
+        if (scrollRounds >= settings.maxScrollRounds) {
+          await log.info("No new jobs after scrolling - done");
+          break;
+        }
+        scrollRounds++;
+        await log.info(`Scrolling for more jobs (round ${scrollRounds}/${settings.maxScrollRounds})`);
+        scrollJobList();
+        await sleep(1500);
+      }
+    }
+  } catch (err) {
+    await log.error(err.message);
+  } finally {
+    if (stopRequested) await log.warn("Stopped by user");
+    await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, unreadable: ${stats.unreadable}`);
+    running = false;
+    await setStatus({ running: false, stats, current: "" });
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Messages from background/popup                                      */
+/* ------------------------------------------------------------------ */
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "start") {
+    runBot();
+    sendResponse({ ok: true });
+  } else if (msg.type === "stop") {
+    stopRequested = true;
+    sendResponse({ ok: true });
+  } else if (msg.type === "ping") {
+    sendResponse({ ok: true, running });
+  }
+});
+
+// A page reload kills any in-flight run; make the popup reflect that.
+setStatus({ running: false, current: "" });

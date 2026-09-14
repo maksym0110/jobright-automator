@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Jobright Bot — Settings</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { max-width: 720px; margin: 24px auto; padding: 0 16px; font: 14px/1.5 system-ui, sans-serif; background: #fff; color: #111; }
+    @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #eee; } }
+    h1 { font-size: 20px; } h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid #8884; padding-bottom: 4px; }
+    .field { display: grid; grid-template-columns: 240px 1fr; gap: 12px; align-items: center; padding: 6px 0; }
+    .field label { font-weight: 600; }
+    .field small { display: block; font-weight: 400; opacity: .7; }
+    input[type=text], input[type=number], input[type=password], select, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; border: 1px solid #8886; border-radius: 6px; background: transparent; color: inherit; }
+    textarea { height: 90px; font-family: ui-monospace, monospace; }
+    button { padding: 7px 14px; border-radius: 6px; border: 1px solid #8886; background: #eee; cursor: pointer; font: inherit; }
+    @media (prefers-color-scheme: dark) { button { background: #333; color: #eee; } }
+    button.primary { background: #00d38a; border-color: #00b978; color: #062; font-weight: 600; }
+    .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+    #msg { margin-left: 8px; } #msg.ok { color: #0a8; } #msg.err { color: #e55; }
+    .hint { font-size: 12px; opacity: .75; }
+  </style>
+</head>
+<body>
+  <h1>Jobright Bot — Settings</h1>
+  <p class="hint">These are the bot's variables (the equivalent of the Node bot's <code>.env</code>). Saved in this browser profile.</p>
+
+  <h2>Run behaviour</h2>
+  <div class="field"><label>Dry run<small>Never click Apply — only report what it would do.</small></label><input type="checkbox" id="dryRun" /></div>
+  <div class="field"><label>Max applications per run<small>Safety cap on Apply clicks. Start small.</small></label><input type="number" id="maxApplicationsPerRun" min="0" /></div>
+  <div class="field"><label>Max scroll rounds<small>Scroll attempts to load more jobs (0 = only what's visible).</small></label><input type="number" id="maxScrollRounds" min="0" /></div>
+  <div class="field"><label>Delay between jobs (ms)</label><input type="number" id="delayBetweenJobs" min="0" step="100" /></div>
+  <div class="field"><label>"APPLY NOW" cards<small>Cards without autofill (LinkedIn-style jobs).</small></label>
+    <select id="applyNowBehavior"><option value="skip">Skip (only "Apply with Autofill")</option><option value="click">Click them too</option></select></div>
+
+  <h2>Timeouts</h2>
+  <div class="field"><label>New tab timeout (ms)</label><input type="number" id="newTabTimeout" min="1000" step="1000" /></div>
+  <div class="field"><label>Confirmation timeout (ms)<small>How long to wait for "Did you apply?".</small></label><input type="number" id="confirmationTimeout" min="1000" step="1000" /></div>
+  <div class="field"><label>When no tab appears</label>
+    <select id="onNewTabTimeout"><option value="continue">Continue with next job</option><option value="stop">Stop the run</option></select></div>
+
+  <h2>Resume-builder history (Supabase)</h2>
+  <div class="field"><label>Supabase URL</label><input type="text" id="supabaseUrl" placeholder="https://xxxx.supabase.co" /></div>
+  <div class="field"><label>Supabase API key<small>Supabase → Project Settings → API. anon key works if RLS is off; otherwise service_role.</small></label><input type="password" id="supabaseKey" /></div>
+  <div class="field"><label>User ID filter<small>Optional: only rows with this user_id.</small></label><input type="text" id="remoteUserId" placeholder="(all users)" /></div>
+  <div class="field"><label>Sync before every run</label><input type="checkbox" id="syncBeforeRun" /></div>
+  <div class="field"><label>Refuse to run if sync fails<small>Safer: a stale list is how you re-apply to a company.</small></label><input type="checkbox" id="requireSync" /></div>
+  <div class="actions">
+    <button id="test">Test connection</button>
+    <button id="sync">Sync now</button>
+    <span id="syncMsg"></span>
+  </div>
+
+  <h2>History</h2>
+  <div class="field"><label>Companies in history</label><span id="historyCount"></span></div>
+  <div class="field"><label>Add companies manually<small>One per line. Marked as applied.</small></label><textarea id="manual" placeholder="Anrok&#10;GoDaddy"></textarea></div>
+  <div class="actions">
+    <button id="addManual">Add to history</button>
+    <button id="exportHistory">Export JSON</button>
+    <span id="histMsg"></span>
+  </div>
+
+  <div class="actions">
+    <button id="save" class="primary">Save settings</button>
+    <button id="reset">Reset to defaults</button>
+    <span id="msg"></span>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

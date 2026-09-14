@@ -1,0 +1,7 @@
+node_modules/
+dist/
+browser-profile/
+data/*.db
+data/*.db-*
+logs/
+.env

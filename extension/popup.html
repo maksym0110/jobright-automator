@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Jobright Bot</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { width: 420px; margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #fff; color: #111; }
+    @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #eee; } }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #8884; }
+    header h1 { font-size: 14px; margin: 0; }
+    header a { font-size: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+    button { padding: 6px 12px; border-radius: 6px; border: 1px solid #8886; background: #eee; cursor: pointer; font: inherit; }
+    @media (prefers-color-scheme: dark) { button { background: #333; color: #eee; } }
+    button.primary { background: #00d38a; border-color: #00b978; color: #062; font-weight: 600; }
+    button.danger { background: #e55; border-color: #c33; color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    label { display: inline-flex; align-items: center; gap: 4px; }
+    input[type=number] { width: 56px; font: inherit; }
+    #status { font-weight: 600; }
+    #status.running { color: #0a8; }
+    #stats { font-size: 12px; opacity: .8; padding: 0 12px 6px; }
+    #current { font-size: 12px; opacity: .8; padding: 0 12px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #log { height: 240px; overflow: auto; margin: 0 12px 12px; padding: 8px; background: #111; color: #ddd; font: 11px/1.5 ui-monospace, monospace; border-radius: 6px; white-space: pre-wrap; }
+    #log .warn { color: #fc6; } #log .error { color: #f77; } #log .dry { color: #8cf; }
+    #err { color: #e55; padding: 0 12px 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Jobright Bot</h1>
+    <a href="#" id="openOptions">Settings ⚙</a>
+  </header>
+
+  <div class="row">
+    <button id="start" class="primary">▶ Start</button>
+    <button id="startOffline" title="Skip the resume-builder sync">Start offline</button>
+    <button id="stop" class="danger" disabled>■ Stop</button>
+    <span id="status">idle</span>
+  </div>
+
+  <div class="row">
+    <label><input type="checkbox" id="dryRun" /> Dry run (no clicks)</label>
+    <label>Max applies <input type="number" id="maxApplicationsPerRun" min="0" /></label>
+    <span id="historyCount"></span>
+  </div>
+
+  <div id="current"></div>
+  <div id="stats"></div>
+  <div id="err"></div>
+  <div id="log"></div>
+
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
