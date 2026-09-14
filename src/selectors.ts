@@ -20,6 +20,10 @@ export const selectors = {
    * "Apply with Autofill" or "APPLY NOW" (no autofill support).
    */
   applyButton: 'button[class*="index_apply-button__"]',
+
+  /** "4 hours ago" or "Reposted 2 hours ago" tag on the card. */
+  publishTime: '[class*="index_publish-time__"]',
+  repostedText: /^reposted/i,
   applyWithAutofillText: /apply with autofill/i,
   applyNowText: /^apply now$/i,
 

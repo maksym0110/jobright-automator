@@ -30,12 +30,16 @@
   <div class="field"><label>Max applications per run<small>Safety cap on Apply clicks. Start small.</small></label><input type="number" id="maxApplicationsPerRun" min="0" /></div>
   <div class="field"><label>Max scroll rounds<small>Scroll attempts to load more jobs (0 = only what's visible).</small></label><input type="number" id="maxScrollRounds" min="0" /></div>
   <div class="field"><label>Delay between jobs (ms)</label><input type="number" id="delayBetweenJobs" min="0" step="100" /></div>
+  <div class="field"><label>Reload Jobright on Start<small>Refreshes the job list before every run.</small></label><input type="checkbox" id="reloadBeforeRun" /></div>
+  <div class="field"><label>Skip reposted jobs<small>Cards tagged "Reposted N hours ago".</small></label><input type="checkbox" id="skipReposted" /></div>
   <div class="field"><label>"APPLY NOW" cards<small>Cards without autofill (LinkedIn-style jobs).</small></label>
     <select id="applyNowBehavior"><option value="skip">Skip (only "Apply with Autofill")</option><option value="click">Click them too</option></select></div>
 
   <h2>Timeouts</h2>
   <div class="field"><label>New tab timeout (ms)</label><input type="number" id="newTabTimeout" min="1000" step="1000" /></div>
   <div class="field"><label>Confirmation timeout (ms)<small>How long to wait for "Did you apply?".</small></label><input type="number" id="confirmationTimeout" min="1000" step="1000" /></div>
+  <div class="field"><label>Pause before "Yes, I applied!" (ms)<small>Random between min and max, so you can see the modal and it doesn't look scripted.</small></label>
+    <span style="display:flex;gap:8px;align-items:center"><input type="number" id="confirmDelayMin" min="0" step="100" /> – <input type="number" id="confirmDelayMax" min="0" step="100" /></span></div>
   <div class="field"><label>When no tab appears</label>
     <select id="onNewTabTimeout"><option value="continue">Continue with next job</option><option value="stop">Stop the run</option></select></div>
 

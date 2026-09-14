@@ -30,6 +30,11 @@ process.on("SIGINT", () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const randomBetween = (min: number, max: number) => {
+  const lo = Math.max(0, Math.min(min, max));
+  const hi = Math.max(min, max);
+  return lo + Math.random() * (hi - lo);
+};
 
 function waitForEnter(prompt: string): Promise<void> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -49,7 +54,7 @@ function firstLine(err: unknown): string {
 /* Per-job state machine                                               */
 /* ------------------------------------------------------------------ */
 
-type Outcome = "skipped" | "applied" | "failed" | "dry-run" | "no-autofill";
+type Outcome = "skipped" | "applied" | "failed" | "dry-run" | "no-autofill" | "reposted";
 
 async function processJob(
   card: Locator,
@@ -58,7 +63,13 @@ async function processJob(
   tabs: TabManager,
 ): Promise<Outcome> {
   const page = tabs.jobright;
-  log.info(`Job found: ${job.title} | Company: ${job.company}`);
+  log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
+
+  // REPOSTED -> skip before anything else
+  if (job.reposted && config.skipReposted) {
+    log.info("Job is reposted -> SKIP");
+    return "reposted";
+  }
 
   // CHECK_COMPANY
   if (history.hasApplied(job.company)) {
@@ -137,7 +148,10 @@ async function processJob(
   if (!externalTab) log.warn("Confirmation modal appeared but no new tab was detected - proceeding on the modal");
   log.info("Confirmation modal detected");
 
-  // CLICK_YES_APPLIED
+  // CLICK_YES_APPLIED - pause like a person reading the modal first.
+  const pause = randomBetween(config.confirmDelayMin, config.confirmDelayMax);
+  log.info(`Waiting ${(pause / 1000).toFixed(1)}s before confirming`);
+  await sleep(pause);
   try {
     log.info('Clicking "Yes, I applied!"');
     await yesButton.click({ timeout: 5_000 });
@@ -168,7 +182,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
   );
 
   const seen = new Set<string>();
-  const stats = { skipped: 0, applied: 0, failed: 0, dryRun: 0, unreadable: 0, noAutofill: 0 };
+  const stats = { skipped: 0, applied: 0, failed: 0, dryRun: 0, unreadable: 0, noAutofill: 0, reposted: 0 };
   let scrollRounds = 0;
 
   try {
@@ -201,6 +215,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
         else if (outcome === "applied") stats.applied++;
         else if (outcome === "failed") stats.failed++;
         else if (outcome === "no-autofill") stats.noAutofill++;
+        else if (outcome === "reposted") stats.reposted++;
         else stats.dryRun++;
 
         // Always re-assert the control tab before moving on (AC-08).
@@ -220,7 +235,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
     }
   } finally {
     log.info(
-      `Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, unreadable: ${stats.unreadable}`,
+      `Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`,
     );
     log.info(`External tabs left open: ${tabs.externalTabs.length}`);
     log.info(`Log file: ${log.file}`);

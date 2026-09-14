@@ -104,12 +104,45 @@ async function trustedClick(tabId, x, y) {
 /* Run control                                                         */
 /* ------------------------------------------------------------------ */
 
+/** Reload the tab and wait until the page (and our content script) is back. */
+async function reloadAndWait(tabId, timeoutMs = 30000) {
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { chrome.tabs.onUpdated.removeListener(onUpdated); reject(new Error("Jobright tab did not finish reloading")); }, timeoutMs);
+    function onUpdated(id, info) {
+      if (id === tabId && info.status === "complete") {
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.reload(tabId).catch(reject);
+  });
+  // The SPA renders the list after "complete"; poll until the content script answers.
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await chrome.tabs.sendMessage(tabId, { type: "ping" }).catch(() => null);
+    if (res && res.ok) {
+      await new Promise((r) => setTimeout(r, 2500)); // let the job cards render
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new Error("Content script did not come back after reload");
+}
+
 async function startRun(opts) {
   const tab = await findJobrightTab();
   if (!tab) throw new Error("No jobright.ai tab open");
   jobrightTabId = tab.id;
   const settings = await getSettings();
   await chrome.storage.local.set({ log: [] });
+
+  if (settings.reloadBeforeRun) {
+    await log.info("Reloading Jobright for a fresh job list...");
+    await chrome.tabs.update(tab.id, { active: true });
+    await reloadAndWait(tab.id);
+  }
 
   if (settings.syncBeforeRun && !opts.offline) {
     try {

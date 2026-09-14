@@ -12,6 +12,8 @@ const SEL = {
   jobTitle: '[class*="index_job-title__"]',
   companyName: '[class*="index_company-name__"]',
   applyButton: 'button[class*="index_apply-button__"]',
+  publishTime: '[class*="index_publish-time__"]',
+  repostedText: /^reposted/i,
   applyWithAutofillText: /apply with autofill/i,
   applyNowText: /^apply now$/i,
   yesAppliedText: /yes,?\s*i applied/i,
@@ -21,6 +23,11 @@ const SEL = {
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const randomBetween = (min, max) => {
+  const lo = Math.max(0, Math.min(min, max));
+  const hi = Math.max(min, max);
+  return lo + Math.random() * (hi - lo);
+};
 const text = (el) => (el ? el.textContent || "" : "").replace(/\s+/g, " ").trim();
 const isVisible = (el) => !!el && el.offsetParent !== null && el.getClientRects().length > 0;
 
@@ -42,12 +49,14 @@ function readJobCard(card) {
   if (!company) return null;
   const btn = card.querySelector(SEL.applyButton);
   const btnText = text(btn);
+  const posted = text(card.querySelector(SEL.publishTime));
+  const reposted = SEL.repostedText.test(posted);
   const applyKind = SEL.applyWithAutofillText.test(btnText)
     ? "autofill"
     : SEL.applyNowText.test(btnText)
       ? "apply-now"
       : "none";
-  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn };
+  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn, posted, reposted };
 }
 
 function scrollJobList() {
@@ -124,7 +133,13 @@ let running = false;
 let stopRequested = false;
 
 async function processJob(job, settings, stats) {
-  await log.info(`Job found: ${job.title} | Company: ${job.company}`);
+  await log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
+
+  // REPOSTED -> skip before anything else
+  if (job.reposted && settings.skipReposted) {
+    await log.info("Job is reposted -> SKIP");
+    return "reposted";
+  }
 
   // CHECK_COMPANY
   if (await hasApplied(job.company)) {
@@ -190,7 +205,15 @@ async function processJob(job, settings, stats) {
   if (!externalTab) await log.warn("Confirmation modal appeared but no new tab was detected - proceeding on the modal");
   await log.info("Confirmation modal detected");
 
-  // CLICK_YES_APPLIED
+  // CLICK_YES_APPLIED - pause like a person reading the modal first.
+  const pause = randomBetween(settings.confirmDelayMin, settings.confirmDelayMax);
+  await log.info(`Waiting ${(pause / 1000).toFixed(1)}s before confirming`);
+  await sleep(pause);
+  if (!isVisible(yesButton)) yesButton = findYesAppliedButton(); // modal may have re-rendered
+  if (!yesButton) {
+    await log.error(`"Yes, I applied!" disappeared before it was clicked for ${job.company} - NOT marking as applied`);
+    return "failed";
+  }
   await log.info('Clicking "Yes, I applied!"');
   yesButton.click(); // no popup involved - a synthetic click is fine here
   await sleep(500);
@@ -211,7 +234,7 @@ async function runBot() {
   stopRequested = false;
   document.documentElement.dataset.jrbotRunning = "1";
   const settings = await getSettings();
-  const stats = { applied: 0, skipped: 0, failed: 0, dryRun: 0, noAutofill: 0, unreadable: 0, externalTabs: 0 };
+  const stats = { applied: 0, skipped: 0, failed: 0, dryRun: 0, noAutofill: 0, reposted: 0, unreadable: 0, externalTabs: 0 };
   const seen = new Set();
   let scrollRounds = 0;
   const historyCount = Object.keys(await getHistory()).length;
@@ -247,6 +270,7 @@ async function runBot() {
         else if (outcome === "applied") stats.applied++;
         else if (outcome === "failed") stats.failed++;
         else if (outcome === "no-autofill") stats.noAutofill++;
+        else if (outcome === "reposted") stats.reposted++;
         else stats.dryRun++;
         await setStatus({ stats });
 
@@ -269,7 +293,7 @@ async function runBot() {
     await log.error(err.message);
   } finally {
     if (stopRequested) await log.warn("Stopped by user");
-    await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, unreadable: ${stats.unreadable}`);
+    await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`);
     running = false;
     delete document.documentElement.dataset.jrbotRunning;
     await bg({ type: "runEnded" });

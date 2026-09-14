@@ -11,6 +11,8 @@ export interface JobInfo {
   title: string;
   company: string;
   applyKind: ApplyKind;
+  posted: string; // e.g. "4 hours ago" / "Reposted 2 hours ago"
+  reposted: boolean;
 }
 
 async function textOf(loc: Locator): Promise<string> {
@@ -39,7 +41,9 @@ export async function readJobCard(card: Locator): Promise<JobInfo | null> {
       ? "apply-now"
       : "none";
 
-  return { id: id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind };
+  const posted = await textOf(card.locator(selectors.publishTime));
+  const reposted = selectors.repostedText.test(posted);
+  return { id: id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, posted, reposted };
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,7 +147,7 @@ export async function inspectPage(page: Page): Promise<void> {
       log.warn(`  unparseable card: ${(await textOf(card)).slice(0, 120)}`);
       continue;
     }
-    log.info(`  [${info.applyKind.padEnd(9)}] ${info.title} | ${info.company} (${info.id})`);
+    log.info(`  [${info.applyKind.padEnd(9)}]${info.reposted ? " [reposted]" : ""} ${info.title} | ${info.company} (${info.id})`);
   }
 
   log.info("=== INSPECT: visible buttons ===");

@@ -22,7 +22,7 @@ async function render() {
 
   const s = status.stats;
   $("stats").textContent = s
-    ? `applied ${s.applied} · skipped ${s.skipped} · dry ${s.dryRun} · failed ${s.failed} · no-autofill ${s.noAutofill}`
+    ? `applied ${s.applied} · skipped ${s.skipped} · dry ${s.dryRun} · failed ${s.failed} · no-autofill ${s.noAutofill} · reposted ${s.reposted || 0}`
     : "";
 
   const logEl = $("log");

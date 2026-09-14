@@ -123,6 +123,8 @@ The local SQLite history is the single source the bot checks. It is fed from:
 | `CONFIRMATION_TIMEOUT` | `15000` | ms to wait for "Did you apply?" |
 | `ON_NEW_TAB_TIMEOUT` | `continue` | `continue` or `stop` when no tab appears |
 | `APPLY_NOW_BEHAVIOR` | `skip` | `skip` or `click` for cards labelled "APPLY NOW" (no autofill) |
+| `SKIP_REPOSTED` | `true` | Skip cards tagged "Reposted …" |
+| `CONFIRM_DELAY_MIN` / `_MAX` | `1500` / `3500` | Random pause before clicking "Yes, I applied!" |
 | `DELAY_BETWEEN_JOBS` | `1500` | ms pause between jobs |
 | `BROWSER_PROFILE_DIR` | `./browser-profile` | Persistent Chrome profile |
 | `DB_PATH` | `./data/jobright.db` | SQLite file |

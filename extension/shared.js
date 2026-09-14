@@ -14,6 +14,10 @@ const DEFAULT_SETTINGS = {
   onNewTabTimeout: "continue", // "continue" | "stop"
   applyNowBehavior: "skip", // "skip" | "click" for cards labelled "APPLY NOW"
   delayBetweenJobs: 2000, // ms pause between jobs
+  skipReposted: true, // skip cards tagged "Reposted ..."
+  reloadBeforeRun: true, // reload the Jobright tab on Start so the job list is fresh
+  confirmDelayMin: 1500, // ms to wait after "Did you apply?" appears before clicking Yes
+  confirmDelayMax: 3500, // randomized between min and max so it doesn't look scripted
 
   // Resume-builder history via Supabase REST (PostgREST).
   supabaseUrl: "https://uzyeurtebuqmvshddrks.supabase.co",

@@ -1,8 +1,8 @@
 const $ = (id) => document.getElementById(id);
 
-const NUMBER_FIELDS = ["maxApplicationsPerRun", "maxScrollRounds", "delayBetweenJobs", "newTabTimeout", "confirmationTimeout"];
+const NUMBER_FIELDS = ["maxApplicationsPerRun", "maxScrollRounds", "delayBetweenJobs", "newTabTimeout", "confirmationTimeout", "confirmDelayMin", "confirmDelayMax"];
 const TEXT_FIELDS = ["applyNowBehavior", "onNewTabTimeout", "supabaseUrl", "supabaseKey", "remoteUserId"];
-const BOOL_FIELDS = ["dryRun", "syncBeforeRun", "requireSync"];
+const BOOL_FIELDS = ["dryRun", "syncBeforeRun", "requireSync", "skipReposted", "reloadBeforeRun"];
 
 function readForm() {
   const s = {};
