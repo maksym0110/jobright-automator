@@ -96,6 +96,26 @@ async function logFailureDiagnostics() {
 
 const bg = (msg) => chrome.runtime.sendMessage(msg).catch(() => null);
 
+/** Real click via DevTools protocol (passes the popup blocker); synthetic fallback. */
+async function clickForReal(el) {
+  el.scrollIntoView({ block: "center" });
+  await sleep(200);
+  const r = el.getBoundingClientRect();
+  const res = await bg({ type: "trustedClick", x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  if (res && res.ok) return "trusted";
+  el.click();
+  return "synthetic";
+}
+
+// page-bridge.js (page world) reports a blocked window.open here.
+window.addEventListener("message", (ev) => {
+  if (ev.source !== window || !ev.data || ev.data.source !== "jrbot") return;
+  if (ev.data.type === "openTab" && running) {
+    log.warn("Page's window.open was blocked - opening the company tab via the extension");
+    bg({ type: "openTab", url: ev.data.url });
+  }
+});
+
 /* ------------------------------------------------------------------ */
 /* Per-job state machine                                               */
 /* ------------------------------------------------------------------ */
@@ -135,7 +155,8 @@ async function processJob(job, settings, stats) {
   let externalTab = null;
   let yesButton = null;
   try {
-    job.button.click();
+    const how = await clickForReal(job.button);
+    if (how === "synthetic") await log.warn("Debugger unavailable - used a synthetic click (new tab may be blocked by Chrome)");
     const deadline = Date.now() + settings.newTabTimeout + settings.confirmationTimeout;
     while (Date.now() < deadline && !stopRequested) {
       if (!externalTab) {
@@ -171,7 +192,7 @@ async function processJob(job, settings, stats) {
 
   // CLICK_YES_APPLIED
   await log.info('Clicking "Yes, I applied!"');
-  yesButton.click();
+  yesButton.click(); // no popup involved - a synthetic click is fine here
   await sleep(500);
 
   // SAVE_COMPANY - only reached after the confirmation click.
@@ -188,6 +209,7 @@ async function runBot() {
   if (running) return;
   running = true;
   stopRequested = false;
+  document.documentElement.dataset.jrbotRunning = "1";
   const settings = await getSettings();
   const stats = { applied: 0, skipped: 0, failed: 0, dryRun: 0, noAutofill: 0, unreadable: 0, externalTabs: 0 };
   const seen = new Set();
@@ -249,6 +271,8 @@ async function runBot() {
     if (stopRequested) await log.warn("Stopped by user");
     await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, unreadable: ${stats.unreadable}`);
     running = false;
+    delete document.documentElement.dataset.jrbotRunning;
+    await bg({ type: "runEnded" });
     await setStatus({ running: false, stats, current: "" });
   }
 }

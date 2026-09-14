@@ -48,6 +48,10 @@ async function send(msg) {
 $("start").addEventListener("click", () => send({ type: "start" }));
 $("startOffline").addEventListener("click", () => send({ type: "start", offline: true }));
 $("stop").addEventListener("click", () => send({ type: "stop" }));
+$("openWindow").addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.windows.create({ url: "popup.html", type: "popup", width: 460, height: 640 });
+});
 $("openOptions").addEventListener("click", (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();

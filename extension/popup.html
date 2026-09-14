@@ -5,7 +5,8 @@
   <title>Jobright Bot</title>
   <style>
     :root { color-scheme: light dark; }
-    body { width: 420px; margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #fff; color: #111; }
+    html, body { height: 100%; }
+    body { margin: 0; min-width: 280px; display: flex; flex-direction: column; font: 13px/1.4 system-ui, sans-serif; background: #fff; color: #111; }
     @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #eee; } }
     header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #8884; }
     header h1 { font-size: 14px; margin: 0; }
@@ -22,7 +23,7 @@
     #status.running { color: #0a8; }
     #stats { font-size: 12px; opacity: .8; padding: 0 12px 6px; }
     #current { font-size: 12px; opacity: .8; padding: 0 12px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #log { height: 240px; overflow: auto; margin: 0 12px 12px; padding: 8px; background: #111; color: #ddd; font: 11px/1.5 ui-monospace, monospace; border-radius: 6px; white-space: pre-wrap; }
+    #log { flex: 1; min-height: 160px; overflow: auto; margin: 0 12px 12px; padding: 8px; background: #111; color: #ddd; font: 11px/1.5 ui-monospace, monospace; border-radius: 6px; white-space: pre-wrap; }
     #log .warn { color: #fc6; } #log .error { color: #f77; } #log .dry { color: #8cf; }
     #err { color: #e55; padding: 0 12px 8px; font-size: 12px; }
   </style>
@@ -30,7 +31,7 @@
 <body>
   <header>
     <h1>Jobright Bot</h1>
-    <a href="#" id="openOptions">Settings ⚙</a>
+    <span><a href="#" id="openWindow" title="Open the panel in its own window">↗ window</a> · <a href="#" id="openOptions">Settings ⚙</a></span>
   </header>
 
   <div class="row">

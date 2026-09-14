@@ -25,11 +25,14 @@ Click the extension icon → **Settings ⚙**. This page is the extension's `.en
 - **History** — count, add names manually, export JSON.
 
 ### Run
-Open Jobright's job list, click the icon, **▶ Start**. The popup shows live status, counters and the log; **■ Stop** ends after the current job. Leave *Dry run* on for the first run, then turn it off with *Max applies* = 2.
+Open Jobright's job list and click the icon — the control panel opens in Chrome's **side panel**, which stays open while the bot switches tabs (**↗ window** pops it out as its own window instead). **▶ Start** runs, **■ Stop** ends after the current job. Leave *Dry run* on for the first run, then turn it off with *Max applies* = 2.
+
+During a live run Chrome shows a bar saying *"Jobright Bot started debugging this browser"*. That's expected: Apply is clicked through the DevTools protocol so it counts as a real user gesture (a synthetic click would be stopped by Chrome's popup blocker and no company tab would open). The bar disappears when the run ends. Don't open DevTools on the Jobright tab during a run — only one debugger can attach.
 
 ### How it works
 - `content.js` runs inside jobright.ai: reads cards, clicks Apply, waits for "Did you apply?", clicks "Yes, I applied!", records the company.
-- `background.js` owns the tabs API: while a click is "armed", any new tab is recorded as the external company tab and the Jobright tab is **immediately refocused**. The external tab is never touched.
+- `background.js` owns the tabs and debugger APIs: sends the real Apply click; while a click is "armed", any new tab is recorded as the external company tab and the Jobright tab is **immediately refocused**. The external tab is never touched.
+- `page-bridge.js` runs in the page world and, only while the bot is running, catches a `window.open` that Chrome blocked and hands the URL to the extension to open (inactive) instead.
 - `chrome.storage.local` holds settings, history and the log — all private to that browser profile.
 
 ## Node bot
