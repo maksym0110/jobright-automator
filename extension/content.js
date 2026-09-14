@@ -14,7 +14,7 @@ const SEL = {
   applyButton: 'button[class*="index_apply-button__"]',
   publishTime: '[class*="index_publish-time__"]',
   notInterestedButton: 'button[id*="not-interest-button"]', // the ⊘ button on the card
-  dropdownMenuItem: ".ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item, [role=menuitem]",
+  dropdownMenuItem: ".ant-dropdown .ant-dropdown-menu-item, .ant-dropdown-menu-item, [role=menuitem]",
   alreadyAppliedText: /^already applied$/i,
   repostedText: /^reposted/i,
   applyWithAutofillText: /apply with autofill/i,
@@ -90,29 +90,53 @@ async function dismissNagModals() {
   return dismissed;
 }
 
-/** ⊘ -> "Already Applied": Jobright moves the card to the Applied list. */
+/** Real click if the debugger is attached, synthetic otherwise. */
+async function clickEl(el) {
+  el.scrollIntoView({ block: "center" });
+  await sleep(150);
+  const r = el.getBoundingClientRect();
+  const res = await bg({ type: "trustedClick", x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  if (!(res && res.ok)) el.click();
+}
+
+function visibleMenuItems() {
+  return [...document.querySelectorAll(SEL.dropdownMenuItem)].filter(isVisible);
+}
+
+/**
+ * ⊘ -> "Already Applied": Jobright moves the card to its Applied list and
+ * removes it from the feed. Success = the card actually left the DOM.
+ */
 async function hideAsAlreadyApplied(card) {
   const btn = card.querySelector(SEL.notInterestedButton);
   if (!btn) {
     await log.warn("Hide: ⊘ button not found on the card");
     return false;
   }
-  btn.scrollIntoView({ block: "center" });
-  await sleep(150);
-  btn.click();
+  await clickEl(btn);
+
   let item = null;
   for (let i = 0; i < 20 && !item; i++) {
     await sleep(150);
-    item = [...document.querySelectorAll(SEL.dropdownMenuItem)].find((el) => isVisible(el) && SEL.alreadyAppliedText.test(text(el)));
+    item = visibleMenuItems().find((el) => SEL.alreadyAppliedText.test(text(el)));
   }
   if (!item) {
-    await log.warn('Hide: "Already Applied" menu item did not appear');
-    document.body.click(); // close whatever opened
+    const seen = visibleMenuItems().map(text);
+    await log.warn(`Hide: "Already Applied" menu item did not appear (menu items seen: ${seen.length ? JSON.stringify(seen) : "none"})`);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     return false;
   }
-  item.click();
-  await sleep(600);
-  return true;
+
+  await clickEl(item);
+
+  // Confirm: the card should leave the list (or Jobright's "Done!" toast shows).
+  for (let i = 0; i < 20; i++) {
+    await sleep(200);
+    if (!card.isConnected || !isVisible(card)) return true;
+    if ([...document.querySelectorAll(".ant-message, .ant-notification")].some((el) => /applied/i.test(text(el)))) return true;
+  }
+  await log.warn("Hide: clicked \"Already Applied\" but the card is still in the list");
+  return false;
 }
 
 function describeOpenModals() {
