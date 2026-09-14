@@ -11,6 +11,7 @@ import {
   readJobCard,
   findApplyButton,
   findYesAppliedButton,
+  hideAsAlreadyApplied,
   dismissNagModals,
   saveFailureSnapshot,
   scrollJobList,
@@ -61,6 +62,7 @@ async function processJob(
   job: JobInfo,
   history: CompanyHistory,
   tabs: TabManager,
+  stats: { hidden: number },
 ): Promise<Outcome> {
   const page = tabs.jobright;
   log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
@@ -74,6 +76,17 @@ async function processJob(
   // CHECK_COMPANY
   if (history.hasApplied(job.company)) {
     log.info("Company already applied -> SKIP");
+    if (config.hideAppliedJobs) {
+      if (config.dryRun) {
+        log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
+      } else {
+        await sleep(randomBetween(800, 2000));
+        if (await hideAsAlreadyApplied(card)) {
+          stats.hidden++;
+          log.info('Hidden via ⊘ -> "Already Applied"');
+        }
+      }
+    }
     return "skipped";
   }
   log.info("Company is new");
@@ -182,7 +195,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
   );
 
   const seen = new Set<string>();
-  const stats = { skipped: 0, applied: 0, failed: 0, dryRun: 0, unreadable: 0, noAutofill: 0, reposted: 0 };
+  const stats = { skipped: 0, hidden: 0, applied: 0, failed: 0, dryRun: 0, unreadable: 0, noAutofill: 0, reposted: 0 };
   let scrollRounds = 0;
 
   try {
@@ -210,7 +223,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
         seen.add(job.id);
         newCardsThisPass++;
 
-        const outcome = await processJob(card, job, history, tabs);
+        const outcome = await processJob(card, job, history, tabs, stats);
         if (outcome === "skipped") stats.skipped++;
         else if (outcome === "applied") stats.applied++;
         else if (outcome === "failed") stats.failed++;
@@ -235,7 +248,7 @@ async function runBot(context: BrowserContext, page: Page, history: CompanyHisto
     }
   } finally {
     log.info(
-      `Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`,
+      `Summary -> applied: ${stats.applied}, skipped: ${stats.skipped} (hidden ${stats.hidden}), would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`,
     );
     log.info(`External tabs left open: ${tabs.externalTabs.length}`);
     log.info(`Log file: ${log.file}`);

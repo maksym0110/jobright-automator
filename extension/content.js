@@ -13,6 +13,9 @@ const SEL = {
   companyName: '[class*="index_company-name__"]',
   applyButton: 'button[class*="index_apply-button__"]',
   publishTime: '[class*="index_publish-time__"]',
+  notInterestedButton: 'button[id*="not-interest-button"]', // the ⊘ button on the card
+  dropdownMenuItem: ".ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item, [role=menuitem]",
+  alreadyAppliedText: /^already applied$/i,
   repostedText: /^reposted/i,
   applyWithAutofillText: /apply with autofill/i,
   applyNowText: /^apply now$/i,
@@ -56,7 +59,7 @@ function readJobCard(card) {
     : SEL.applyNowText.test(btnText)
       ? "apply-now"
       : "none";
-  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn, posted, reposted };
+  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn, posted, reposted, card };
 }
 
 function scrollJobList() {
@@ -85,6 +88,31 @@ async function dismissNagModals() {
     }
   }
   return dismissed;
+}
+
+/** ⊘ -> "Already Applied": Jobright moves the card to the Applied list. */
+async function hideAsAlreadyApplied(card) {
+  const btn = card.querySelector(SEL.notInterestedButton);
+  if (!btn) {
+    await log.warn("Hide: ⊘ button not found on the card");
+    return false;
+  }
+  btn.scrollIntoView({ block: "center" });
+  await sleep(150);
+  btn.click();
+  let item = null;
+  for (let i = 0; i < 20 && !item; i++) {
+    await sleep(150);
+    item = [...document.querySelectorAll(SEL.dropdownMenuItem)].find((el) => isVisible(el) && SEL.alreadyAppliedText.test(text(el)));
+  }
+  if (!item) {
+    await log.warn('Hide: "Already Applied" menu item did not appear');
+    document.body.click(); // close whatever opened
+    return false;
+  }
+  item.click();
+  await sleep(600);
+  return true;
 }
 
 function describeOpenModals() {
@@ -144,6 +172,17 @@ async function processJob(job, settings, stats) {
   // CHECK_COMPANY
   if (await hasApplied(job.company)) {
     await log.info("Company already applied -> SKIP");
+    if (settings.hideAppliedJobs) {
+      if (settings.dryRun) {
+        await log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
+      } else {
+        await sleep(randomBetween(800, 2000));
+        if (await hideAsAlreadyApplied(job.card)) {
+          stats.hidden++;
+          await log.info('Hidden via ⊘ -> "Already Applied"');
+        }
+      }
+    }
     return "skipped";
   }
   await log.info("Company is new");
@@ -234,7 +273,7 @@ async function runBot() {
   stopRequested = false;
   document.documentElement.dataset.jrbotRunning = "1";
   const settings = await getSettings();
-  const stats = { applied: 0, skipped: 0, failed: 0, dryRun: 0, noAutofill: 0, reposted: 0, unreadable: 0, externalTabs: 0 };
+  const stats = { applied: 0, skipped: 0, hidden: 0, failed: 0, dryRun: 0, noAutofill: 0, reposted: 0, unreadable: 0, externalTabs: 0 };
   const seen = new Set();
   let scrollRounds = 0;
   const historyCount = Object.keys(await getHistory()).length;
@@ -254,6 +293,7 @@ async function runBot() {
           await log.info(`Reached max applications per run (${settings.maxApplicationsPerRun}) - stopping`);
           break outer;
         }
+        if (!card.isConnected) continue; // list re-rendered (e.g. after a hide); next pass picks it up
         const job = readJobCard(card);
         if (!job) {
           stats.unreadable++;
@@ -293,7 +333,7 @@ async function runBot() {
     await log.error(err.message);
   } finally {
     if (stopRequested) await log.warn("Stopped by user");
-    await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped}, would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`);
+    await log.info(`Summary -> applied: ${stats.applied}, skipped: ${stats.skipped} (hidden ${stats.hidden}), would-apply(dry): ${stats.dryRun}, failed: ${stats.failed}, no-autofill: ${stats.noAutofill}, reposted: ${stats.reposted}, unreadable: ${stats.unreadable}`);
     running = false;
     delete document.documentElement.dataset.jrbotRunning;
     await bg({ type: "runEnded" });

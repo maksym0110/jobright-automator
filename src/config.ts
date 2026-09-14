@@ -24,6 +24,8 @@ export const config = {
   delayBetweenJobs: int(process.env.DELAY_BETWEEN_JOBS, 1500),
   /** Skip cards tagged "Reposted ...". */
   skipReposted: bool(process.env.SKIP_REPOSTED, true),
+  /** For skipped (already-applied) cards, click ⊘ -> "Already Applied". */
+  hideAppliedJobs: bool(process.env.HIDE_APPLIED_JOBS, true),
   /** Randomized pause after "Did you apply?" appears, before clicking Yes. */
   confirmDelayMin: int(process.env.CONFIRM_DELAY_MIN, 1500),
   confirmDelayMax: int(process.env.CONFIRM_DELAY_MAX, 3500),

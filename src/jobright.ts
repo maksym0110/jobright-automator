@@ -58,6 +58,31 @@ export async function findApplyButton(card: Locator): Promise<Locator | null> {
   return btn.first();
 }
 
+/** ⊘ -> "Already Applied": Jobright moves the card to the Applied list. */
+export async function hideAsAlreadyApplied(card: Locator): Promise<boolean> {
+  const page = card.page();
+  const btn = card.locator(selectors.notInterestedButton);
+  if ((await btn.count()) === 0) {
+    log.warn("Hide: ⊘ button not found on the card");
+    return false;
+  }
+  await btn.first().scrollIntoViewIfNeeded();
+  await btn.first().click();
+  const item = page
+    .getByRole("menuitem", { name: selectors.alreadyAppliedText })
+    .or(page.locator(".ant-dropdown-menu-item", { hasText: selectors.alreadyAppliedText }))
+    .first();
+  try {
+    await item.click({ timeout: 5000 });
+  } catch {
+    log.warn('Hide: "Already Applied" menu item did not appear');
+    await page.keyboard.press("Escape").catch(() => {});
+    return false;
+  }
+  await page.waitForTimeout(600);
+  return true;
+}
+
 /** The "Yes, I applied!" button, if currently visible (no waiting). */
 export async function findYesAppliedButton(page: Page): Promise<Locator | null> {
   const yes = page
