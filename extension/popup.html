@@ -24,31 +24,31 @@
     #stats { font-size: 12px; opacity: .8; padding: 0 12px 6px; }
     #current { font-size: 12px; opacity: .8; padding: 0 12px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* New jobs panel: takes the main space */
-    #jobsPanel { flex: 1; min-height: 120px; display: flex; flex-direction: column; margin: 0 12px 8px; border: 1px solid #8884; border-radius: 6px; overflow: hidden; }
+    #jobsPanel { flex: 1; min-height: 120px; display: flex; flex-direction: column; margin: 0 12px 12px; border: 1px solid #8884; border-radius: 6px; overflow: hidden; }
     .panelHead { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; font-size: 12px; font-weight: 600; background: #8881; border-bottom: 1px solid #8884; }
     .panelHead .count { font-weight: 400; opacity: .7; }
     .panelHead a { font-size: 11px; font-weight: 400; }
     #jobs { flex: 1; overflow: auto; }
     #jobs .empty { padding: 14px 8px; font-size: 12px; opacity: .6; text-align: center; }
-    .job { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 8px; border-bottom: 1px solid #8882; font-size: 12px; }
+    .job { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; padding: 5px 8px; border-bottom: 1px solid #8882; font-size: 12px; align-items: center; }
     .job:last-child { border-bottom: none; }
     .job .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .job .company { opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .job .salary { grid-column: 1; font-variant-numeric: tabular-nums; color: #0a8; }
-    .job .salary.none { color: inherit; opacity: .45; }
-    .job .badge { grid-column: 2; grid-row: 1 / span 3; align-self: center; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; background: #8883; text-transform: uppercase; letter-spacing: .03em; }
+    .job .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+    .job .meta .salary { color: #0a8; font-variant-numeric: tabular-nums; }
+    .job .meta .salary.none { color: inherit; opacity: .5; }
+    .job .badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; background: #8883; text-transform: uppercase; letter-spacing: .03em; justify-self: end; }
     .badge.applied { background: #00d38a33; color: #0a8; }
     .badge.dry-run { background: #8cf3; color: #48c; }
     .badge.failed { background: #f775; color: #d44; }
     .badge.no-autofill { background: #fc64; color: #b80; }
     .badge.pending { background: #8883; opacity: .8; }
-    .job .at { grid-column: 2; grid-row: 4; font-size: 10px; opacity: .5; text-align: right; }
+    .job .at { font-size: 10px; opacity: .5; justify-self: end; }
     /* Log: short, collapsible */
-    #logWrap { margin: 0 12px 12px; }
+    #logWrap { margin: 0 12px 8px; }
     #logWrap .panelHead { border: 1px solid #8884; border-radius: 6px 6px 0 0; }
     #logWrap.collapsed .panelHead { border-radius: 6px; }
     #logWrap.collapsed #log { display: none; }
-    #log { height: 150px; overflow: auto; padding: 8px; background: #111; color: #ddd; font: 11px/1.5 ui-monospace, monospace; border-radius: 0 0 6px 6px; white-space: pre-wrap; box-sizing: border-box; }
+    #log { height: 130px; overflow: auto; padding: 8px; background: #111; color: #ddd; font: 11px/1.5 ui-monospace, monospace; border-radius: 0 0 6px 6px; white-space: pre-wrap; box-sizing: border-box; }
     #log .warn { color: #fc6; } #log .error { color: #f77; } #log .dry { color: #8cf; }
     #err { color: #e55; padding: 0 12px 8px; font-size: 12px; }
   </style>
@@ -76,20 +76,20 @@
   <div id="stats"></div>
   <div id="err"></div>
 
-  <div id="jobsPanel">
-    <div class="panelHead">
-      <span>New jobs this run <span class="count" id="jobsCount"></span></span>
-      <a href="#" id="clearJobs" title="Clear the list">clear</a>
-    </div>
-    <div id="jobs"></div>
-  </div>
-
   <div id="logWrap">
     <div class="panelHead">
       <span>Log</span>
       <a href="#" id="toggleLog">hide ▾</a>
     </div>
     <div id="log"></div>
+  </div>
+
+  <div id="jobsPanel">
+    <div class="panelHead">
+      <span>New jobs this run <span class="count" id="jobsCount"></span></span>
+      <a href="#" id="clearJobs" title="Clear the list">clear</a>
+    </div>
+    <div id="jobs"></div>
   </div>
 
   <script src="shared.js"></script>

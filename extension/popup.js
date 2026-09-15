@@ -57,19 +57,22 @@ function renderJobs(jobs) {
   for (const j of jobs) {
     const row = document.createElement("div");
     row.className = "job";
-    const add = (cls, txt, title) => {
-      const d = document.createElement("div");
+    const mk = (tag, cls, txt, title) => {
+      const d = document.createElement(tag);
       d.className = cls;
       d.textContent = txt;
       if (title) d.title = title;
-      row.appendChild(d);
+      return d;
     };
-    add("title", j.title, j.title);
-    add("company", j.company, j.company);
-    add(j.salary ? "salary" : "salary none", j.salary || "salary not listed");
     const outcome = j.outcome || "pending";
-    add(`badge ${outcome}`, OUTCOME_LABEL[outcome] || outcome);
-    add("at", j.at || "");
+    row.appendChild(mk("div", "title", j.title, j.title));
+    row.appendChild(mk("div", `badge ${outcome}`, OUTCOME_LABEL[outcome] || outcome));
+    const meta = mk("div", "meta", "", `${j.company}${j.salary ? " · " + j.salary : ""}`);
+    meta.appendChild(mk("span", "company", j.company));
+    meta.appendChild(document.createTextNode(" · "));
+    meta.appendChild(mk("span", j.salary ? "salary" : "salary none", j.salary || "no salary listed"));
+    row.appendChild(meta);
+    row.appendChild(mk("div", "at", j.at || ""));
     el.appendChild(row);
   }
 }
