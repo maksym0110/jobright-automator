@@ -27,6 +27,8 @@ Click the extension icon → **Settings ⚙**. This page is the extension's `.en
 ### Run
 Open Jobright's job list and click the icon — the control panel opens in Chrome's **side panel**, which stays open while the bot switches tabs (**↗ window** pops it out as its own window instead). **▶ Start** runs, **■ Stop** ends after the current job. Leave *Dry run* on for the first run, then turn it off with *Max applies* = 2.
 
+The **New jobs this run** panel lists every job whose company was not in the history — role, company, salary (when the card shows one) and what happened to it (applied / dry run / failed / no autofill). The log below it is short by default; **hide ▾ / show ▸** collapses it.
+
 During a live run Chrome shows a bar saying *"Jobright Bot started debugging this browser"*. That's expected: Apply is clicked through the DevTools protocol so it counts as a real user gesture (a synthetic click would be stopped by Chrome's popup blocker and no company tab would open). The bar disappears when the run ends. Don't open DevTools on the Jobright tab during a run — only one debugger can attach.
 
 ### How it works

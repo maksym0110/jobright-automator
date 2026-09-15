@@ -25,6 +25,9 @@ async function render() {
     ? `applied ${s.applied} · skipped ${s.skipped} (hidden ${s.hidden || 0}) · dry ${s.dryRun} · failed ${s.failed} · no-autofill ${s.noAutofill} · reposted ${s.reposted || 0}`
     : "";
 
+  renderJobs(status.newJobs || []);
+  $("clearJobs").hidden = running;
+
   const logEl = $("log");
   logEl.innerHTML = (lines || [])
     .map((l) => {
@@ -36,6 +39,39 @@ async function render() {
     })
     .join("\n");
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+const OUTCOME_LABEL = { applied: "applied", "dry-run": "dry run", failed: "failed", "no-autofill": "no autofill", pending: "pending" };
+
+function renderJobs(jobs) {
+  $("jobsCount").textContent = jobs.length ? `(${jobs.length})` : "";
+  const el = $("jobs");
+  el.replaceChildren();
+  if (!jobs.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "New (not-yet-applied) jobs found during a run show up here.";
+    el.appendChild(empty);
+    return;
+  }
+  for (const j of jobs) {
+    const row = document.createElement("div");
+    row.className = "job";
+    const add = (cls, txt, title) => {
+      const d = document.createElement("div");
+      d.className = cls;
+      d.textContent = txt;
+      if (title) d.title = title;
+      row.appendChild(d);
+    };
+    add("title", j.title, j.title);
+    add("company", j.company, j.company);
+    add(j.salary ? "salary" : "salary none", j.salary || "salary not listed");
+    const outcome = j.outcome || "pending";
+    add(`badge ${outcome}`, OUTCOME_LABEL[outcome] || outcome);
+    add("at", j.at || "");
+    el.appendChild(row);
+  }
 }
 
 async function send(msg) {
@@ -60,6 +96,21 @@ $("dryRun").addEventListener("change", (e) => saveSettings({ dryRun: e.target.ch
 $("maxApplicationsPerRun").addEventListener("change", (e) =>
   saveSettings({ maxApplicationsPerRun: Math.max(0, parseInt(e.target.value, 10) || 0) }),
 );
+
+$("clearJobs").addEventListener("click", async (e) => {
+  e.preventDefault();
+  await setStatus({ newJobs: [] });
+});
+$("toggleLog").addEventListener("click", (e) => {
+  e.preventDefault();
+  const collapsed = $("logWrap").classList.toggle("collapsed");
+  $("toggleLog").textContent = collapsed ? "show ▸" : "hide ▾";
+  localStorage.setItem("logCollapsed", collapsed ? "1" : "");
+});
+if (localStorage.getItem("logCollapsed")) {
+  $("logWrap").classList.add("collapsed");
+  $("toggleLog").textContent = "show ▸";
+}
 
 chrome.storage.onChanged.addListener(render);
 render();

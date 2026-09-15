@@ -13,6 +13,8 @@ const SEL = {
   companyName: '[class*="index_company-name__"]',
   applyButton: 'button[class*="index_apply-button__"]',
   publishTime: '[class*="index_publish-time__"]',
+  metadataItem: '[class*="index_job-metadata-item__"]',
+  salaryIcon: 'svg[aria-label="money"]',
   // The ⊘ button on the card (id "index_not_interest_button__xxxx"); opens a
   // dropdown with "Already Applied" / "Not Interested" / "Report Issue".
   notInterestedButton: 'button[id*="not_interest_button"], button[id*="not-interest-button"], [class*="index_actions-group__"] button.ant-dropdown-trigger',
@@ -48,10 +50,18 @@ function getJobCards() {
   return [...document.querySelectorAll(SEL.jobCard)];
 }
 
+function readSalary(card) {
+  const items = [...card.querySelectorAll(SEL.metadataItem)];
+  const byIcon = items.find((el) => el.querySelector(SEL.salaryIcon));
+  const item = byIcon || items.find((el) => /^\$\s*\d/.test(text(el)));
+  return item ? text(item) : "";
+}
+
 function readJobCard(card) {
   const company = text(card.querySelector(SEL.companyName));
   const title = text(card.querySelector(SEL.jobTitle));
   if (!company) return null;
+  const salary = readSalary(card);
   const btn = card.querySelector(SEL.applyButton);
   const btnText = text(btn);
   const posted = text(card.querySelector(SEL.publishTime));
@@ -61,7 +71,7 @@ function readJobCard(card) {
     : SEL.applyNowText.test(btnText)
       ? "apply-now"
       : "none";
-  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, applyKind, button: btn, posted, reposted, card };
+  return { id: card.id || `${title}|${company}`.toLowerCase(), title: title || "(untitled)", company, salary, applyKind, button: btn, posted, reposted, card };
 }
 
 function scrollJobList() {
@@ -203,6 +213,23 @@ async function hideCard(job, settings, stats) {
   return true;
 }
 
+/* New (not-yet-applied) jobs seen this run, newest first. Shown in the popup. */
+const NEW_JOBS_MAX = 100;
+let newJobs = [];
+
+async function recordNewJob(job) {
+  newJobs.unshift({ id: job.id, title: job.title, company: job.company, salary: job.salary || "", outcome: "pending", at: timestamp() });
+  if (newJobs.length > NEW_JOBS_MAX) newJobs.length = NEW_JOBS_MAX;
+  await setStatus({ newJobs });
+}
+
+async function setNewJobOutcome(id, outcome) {
+  const entry = newJobs.find((j) => j.id === id);
+  if (!entry || entry.outcome === outcome) return;
+  entry.outcome = outcome;
+  await setStatus({ newJobs });
+}
+
 async function processJob(job, settings, stats) {
   await log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
 
@@ -219,7 +246,8 @@ async function processJob(job, settings, stats) {
     await hideCard(job, settings, stats);
     return "skipped";
   }
-  await log.info("Company is new");
+  await log.info(`Company is new${job.salary ? ` | ${job.salary}` : ""}`);
+  await recordNewJob(job);
 
   if (job.applyKind === "apply-now" && settings.applyNowBehavior === "skip") {
     await log.warn(`Card shows "APPLY NOW" (no autofill) for ${job.company} -> SKIP (applyNowBehavior=skip)`);
@@ -312,7 +340,8 @@ async function runBot() {
   let scrollRounds = 0;
   const historyCount = Object.keys(await getHistory()).length;
 
-  await setStatus({ running: true, stats, current: "" });
+  newJobs = [];
+  await setStatus({ running: true, stats, current: "", newJobs });
   await log.info(`Mode: ${settings.dryRun ? "DRY RUN (no clicks)" : "LIVE"} | history has ${historyCount} companies | max applies this run: ${settings.maxApplicationsPerRun}`);
 
   try {
@@ -347,6 +376,7 @@ async function runBot() {
         else if (outcome === "reposted") stats.reposted++;
         else stats.dryRun++;
         await setStatus({ stats });
+        await setNewJobOutcome(job.id, outcome);
 
         await bg({ type: "focusJobright" }); // AC-08: always operate from Jobright
         await sleep(settings.delayBetweenJobs);
