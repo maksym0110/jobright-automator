@@ -25,7 +25,7 @@ async function render() {
     ? `applied ${s.applied} · skipped ${s.skipped} (hidden ${s.hidden || 0}) · dry ${s.dryRun} · failed ${s.failed} · no-autofill ${s.noAutofill} · reposted ${s.reposted || 0}`
     : "";
 
-  renderJobs(status.newJobs || []);
+  renderJobs(status.appliedJobs || []);
   $("clearJobs").hidden = running;
 
   const logEl = $("log");
@@ -41,7 +41,7 @@ async function render() {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-const OUTCOME_LABEL = { applied: "applied", "dry-run": "dry run", failed: "failed", "no-autofill": "no autofill", pending: "pending" };
+const OUTCOME_LABEL = { applied: "applied", "dry-run": "would apply" };
 
 function renderJobs(jobs) {
   $("jobsCount").textContent = jobs.length ? `(${jobs.length})` : "";
@@ -50,7 +50,7 @@ function renderJobs(jobs) {
   if (!jobs.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "New (not-yet-applied) jobs found during a run show up here.";
+    empty.textContent = "Jobs the bot applies to during a run show up here.";
     el.appendChild(empty);
     return;
   }
@@ -64,7 +64,7 @@ function renderJobs(jobs) {
       if (title) d.title = title;
       return d;
     };
-    const outcome = j.outcome || "pending";
+    const outcome = j.outcome || "applied";
     row.appendChild(mk("div", "title", j.title, j.title));
     row.appendChild(mk("div", `badge ${outcome}`, OUTCOME_LABEL[outcome] || outcome));
     const meta = mk("div", "meta", "", `${j.company}${j.salary ? " · " + j.salary : ""}`);
@@ -102,7 +102,7 @@ $("maxApplicationsPerRun").addEventListener("change", (e) =>
 
 $("clearJobs").addEventListener("click", async (e) => {
   e.preventDefault();
-  await setStatus({ newJobs: [] });
+  await setStatus({ appliedJobs: [] });
 });
 $("toggleLog").addEventListener("click", (e) => {
   e.preventDefault();

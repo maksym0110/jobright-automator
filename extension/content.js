@@ -213,21 +213,14 @@ async function hideCard(job, settings, stats) {
   return true;
 }
 
-/* New (not-yet-applied) jobs seen this run, newest first. Shown in the popup. */
-const NEW_JOBS_MAX = 100;
-let newJobs = [];
+/* Jobs applied to this run (newest first). Shown in the popup. */
+const APPLIED_JOBS_MAX = 100;
+let appliedJobs = [];
 
-async function recordNewJob(job) {
-  newJobs.unshift({ id: job.id, title: job.title, company: job.company, salary: job.salary || "", outcome: "pending", at: timestamp() });
-  if (newJobs.length > NEW_JOBS_MAX) newJobs.length = NEW_JOBS_MAX;
-  await setStatus({ newJobs });
-}
-
-async function setNewJobOutcome(id, outcome) {
-  const entry = newJobs.find((j) => j.id === id);
-  if (!entry || entry.outcome === outcome) return;
-  entry.outcome = outcome;
-  await setStatus({ newJobs });
+async function recordAppliedJob(job, outcome) {
+  appliedJobs.unshift({ id: job.id, title: job.title, company: job.company, salary: job.salary || "", outcome, at: timestamp() });
+  if (appliedJobs.length > APPLIED_JOBS_MAX) appliedJobs.length = APPLIED_JOBS_MAX;
+  await setStatus({ appliedJobs });
 }
 
 async function processJob(job, settings, stats) {
@@ -247,7 +240,6 @@ async function processJob(job, settings, stats) {
     return "skipped";
   }
   await log.info(`Company is new${job.salary ? ` | ${job.salary}` : ""}`);
-  await recordNewJob(job);
 
   if (job.applyKind === "apply-now" && settings.applyNowBehavior === "skip") {
     await log.warn(`Card shows "APPLY NOW" (no autofill) for ${job.company} -> SKIP (applyNowBehavior=skip)`);
@@ -261,6 +253,7 @@ async function processJob(job, settings, stats) {
 
   if (settings.dryRun) {
     await log.dry(`Company: ${job.company} | Status: NEW | Action: WOULD CLICK APPLY`);
+    await recordAppliedJob(job, "dry-run");
     return "dry-run";
   }
 
@@ -322,6 +315,7 @@ async function processJob(job, settings, stats) {
   // SAVE_COMPANY - only reached after the confirmation click.
   const added = await addToHistory([job.company], "bot");
   await log.info(added ? `${job.company} added to applied-company history` : `${job.company} was already in history (no duplicate created)`);
+  await recordAppliedJob(job, "applied");
   return "applied";
 }
 
@@ -340,8 +334,8 @@ async function runBot() {
   let scrollRounds = 0;
   const historyCount = Object.keys(await getHistory()).length;
 
-  newJobs = [];
-  await setStatus({ running: true, stats, current: "", newJobs });
+  appliedJobs = [];
+  await setStatus({ running: true, stats, current: "", appliedJobs });
   await log.info(`Mode: ${settings.dryRun ? "DRY RUN (no clicks)" : "LIVE"} | history has ${historyCount} companies | max applies this run: ${settings.maxApplicationsPerRun}`);
 
   try {
@@ -376,7 +370,6 @@ async function runBot() {
         else if (outcome === "reposted") stats.reposted++;
         else stats.dryRun++;
         await setStatus({ stats });
-        await setNewJobOutcome(job.id, outcome);
 
         await bg({ type: "focusJobright" }); // AC-08: always operate from Jobright
         await sleep(settings.delayBetweenJobs);

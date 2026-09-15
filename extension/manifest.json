@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jobright Bot",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Skips companies you've already applied to, clicks Apply with Autofill for new ones, returns to Jobright and confirms.",
   "permissions": ["tabs", "storage", "sidePanel", "debugger"],
   "host_permissions": ["https://jobright.ai/*", "https://*.supabase.co/*"],

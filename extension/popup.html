@@ -23,7 +23,7 @@
     #status.running { color: #0a8; }
     #stats { font-size: 12px; opacity: .8; padding: 0 12px 6px; }
     #current { font-size: 12px; opacity: .8; padding: 0 12px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* New jobs panel: takes the main space */
+    /* Applied-jobs panel: takes the main space */
     #jobsPanel { flex: 1; min-height: 120px; display: flex; flex-direction: column; margin: 0 12px 12px; border: 1px solid #8884; border-radius: 6px; overflow: hidden; }
     .panelHead { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; font-size: 12px; font-weight: 600; background: #8881; border-bottom: 1px solid #8884; }
     .panelHead .count { font-weight: 400; opacity: .7; }
@@ -39,9 +39,6 @@
     .job .badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; background: #8883; text-transform: uppercase; letter-spacing: .03em; justify-self: end; }
     .badge.applied { background: #00d38a33; color: #0a8; }
     .badge.dry-run { background: #8cf3; color: #48c; }
-    .badge.failed { background: #f775; color: #d44; }
-    .badge.no-autofill { background: #fc64; color: #b80; }
-    .badge.pending { background: #8883; opacity: .8; }
     .job .at { font-size: 10px; opacity: .5; justify-self: end; }
     /* Log: short, collapsible */
     #logWrap { margin: 0 12px 8px; }
@@ -86,7 +83,7 @@
 
   <div id="jobsPanel">
     <div class="panelHead">
-      <span>New jobs this run <span class="count" id="jobsCount"></span></span>
+      <span>Applied this run <span class="count" id="jobsCount"></span></span>
       <a href="#" id="clearJobs" title="Clear the list">clear</a>
     </div>
     <div id="jobs"></div>
