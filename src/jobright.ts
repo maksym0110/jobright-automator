@@ -67,11 +67,13 @@ export async function hideAsAlreadyApplied(card: Locator): Promise<boolean> {
     return false;
   }
   await btn.first().scrollIntoViewIfNeeded();
-  await btn.first().click();
+  // antd dropdown trigger: hover opens it; click as a fallback.
+  await btn.first().hover();
   const item = page
     .getByRole("menuitem", { name: selectors.alreadyAppliedText })
     .or(page.locator(".ant-dropdown-menu-item", { hasText: selectors.alreadyAppliedText }))
     .first();
+  if (!(await item.isVisible().catch(() => false))) await btn.first().click();
   try {
     await item.click({ timeout: 5000 });
   } catch {

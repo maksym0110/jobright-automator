@@ -13,7 +13,9 @@ const SEL = {
   companyName: '[class*="index_company-name__"]',
   applyButton: 'button[class*="index_apply-button__"]',
   publishTime: '[class*="index_publish-time__"]',
-  notInterestedButton: 'button[id*="not-interest-button"]', // the ⊘ button on the card
+  // The ⊘ button on the card (id "index_not_interest_button__xxxx"); opens a
+  // dropdown with "Already Applied" / "Not Interested" / "Report Issue".
+  notInterestedButton: 'button[id*="not_interest_button"], button[id*="not-interest-button"], [class*="index_actions-group__"] button.ant-dropdown-trigger',
   dropdownMenuItem: ".ant-dropdown .ant-dropdown-menu-item, .ant-dropdown-menu-item, [role=menuitem]",
   alreadyAppliedText: /^already applied$/i,
   repostedText: /^reposted/i,
@@ -113,12 +115,16 @@ async function hideAsAlreadyApplied(card) {
     await log.warn("Hide: ⊘ button not found on the card");
     return false;
   }
-  await clickEl(btn);
-
-  let item = null;
+  // antd dropdown trigger: hover opens it; click as a fallback.
+  btn.scrollIntoView({ block: "center" });
+  for (const type of ["pointerover", "mouseover", "mouseenter"]) btn.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+  await sleep(250);
+  const findItem = () => visibleMenuItems().find((el) => SEL.alreadyAppliedText.test(text(el)));
+  let item = findItem();
+  if (!item) await clickEl(btn);
   for (let i = 0; i < 20 && !item; i++) {
     await sleep(150);
-    item = visibleMenuItems().find((el) => SEL.alreadyAppliedText.test(text(el)));
+    item = findItem();
   }
   if (!item) {
     const seen = visibleMenuItems().map(text);
@@ -184,29 +190,33 @@ window.addEventListener("message", (ev) => {
 let running = false;
 let stopRequested = false;
 
+/** ⊘ -> "Already Applied" so Jobright drops the card from the feed (dry run: log only). */
+async function hideCard(job, settings, stats) {
+  if (settings.dryRun) {
+    await log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
+    return false;
+  }
+  await sleep(randomBetween(800, 2000));
+  if (!(await hideAsAlreadyApplied(job.card))) return false;
+  stats.hidden++;
+  await log.info('Hidden via ⊘ -> "Already Applied"');
+  return true;
+}
+
 async function processJob(job, settings, stats) {
   await log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
 
-  // REPOSTED -> skip before anything else
-  if (job.reposted && settings.skipReposted) {
-    await log.info("Job is reposted -> SKIP");
+  // REPOSTED -> remove from the list via ⊘ -> "Already Applied"
+  if (job.reposted) {
+    await log.info("Job is reposted -> remove from list");
+    await hideCard(job, settings, stats);
     return "reposted";
   }
 
-  // CHECK_COMPANY
+  // CHECK_COMPANY -> already in history: remove from the list the same way
   if (await hasApplied(job.company)) {
-    await log.info("Company already applied -> SKIP");
-    if (settings.hideAppliedJobs) {
-      if (settings.dryRun) {
-        await log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
-      } else {
-        await sleep(randomBetween(800, 2000));
-        if (await hideAsAlreadyApplied(job.card)) {
-          stats.hidden++;
-          await log.info('Hidden via ⊘ -> "Already Applied"');
-        }
-      }
-    }
+    await log.info("Company already applied -> remove from list");
+    await hideCard(job, settings, stats);
     return "skipped";
   }
   await log.info("Company is new");

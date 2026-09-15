@@ -57,6 +57,19 @@ function firstLine(err: unknown): string {
 
 type Outcome = "skipped" | "applied" | "failed" | "dry-run" | "no-autofill" | "reposted";
 
+/** ⊘ -> "Already Applied" so Jobright drops the card from the feed (dry run: log only). */
+async function hideCard(card: Locator, job: JobInfo, stats: { hidden: number }): Promise<boolean> {
+  if (config.dryRun) {
+    log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
+    return false;
+  }
+  await sleep(randomBetween(800, 2000));
+  if (!(await hideAsAlreadyApplied(card))) return false;
+  stats.hidden++;
+  log.info('Hidden via ⊘ -> "Already Applied"');
+  return true;
+}
+
 async function processJob(
   card: Locator,
   job: JobInfo,
@@ -67,26 +80,17 @@ async function processJob(
   const page = tabs.jobright;
   log.info(`Job found: ${job.title} | Company: ${job.company}${job.reposted ? ` | ${job.posted}` : ""}`);
 
-  // REPOSTED -> skip before anything else
-  if (job.reposted && config.skipReposted) {
-    log.info("Job is reposted -> SKIP");
+  // REPOSTED -> remove from the list via ⊘ -> "Already Applied"
+  if (job.reposted) {
+    log.info("Job is reposted -> remove from list");
+    await hideCard(card, job, stats);
     return "reposted";
   }
 
-  // CHECK_COMPANY
+  // CHECK_COMPANY -> already in history: remove from the list the same way
   if (history.hasApplied(job.company)) {
-    log.info("Company already applied -> SKIP");
-    if (config.hideAppliedJobs) {
-      if (config.dryRun) {
-        log.dry(`Company: ${job.company} | Action: WOULD HIDE (⊘ -> Already Applied)`);
-      } else {
-        await sleep(randomBetween(800, 2000));
-        if (await hideAsAlreadyApplied(card)) {
-          stats.hidden++;
-          log.info('Hidden via ⊘ -> "Already Applied"');
-        }
-      }
-    }
+    log.info("Company already applied -> remove from list");
+    await hideCard(card, job, stats);
     return "skipped";
   }
   log.info("Company is new");

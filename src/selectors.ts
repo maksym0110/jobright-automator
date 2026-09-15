@@ -22,7 +22,7 @@ export const selectors = {
   applyButton: 'button[class*="index_apply-button__"]',
 
   /** ⊘ button on the card; opens a dropdown with "Already Applied". */
-  notInterestedButton: 'button[id*="not-interest-button"]',
+  notInterestedButton: 'button[id*="not_interest_button"], button[id*="not-interest-button"], [class*="index_actions-group__"] button.ant-dropdown-trigger',
   alreadyAppliedText: /^already applied$/i,
 
   /** "4 hours ago" or "Reposted 2 hours ago" tag on the card. */
