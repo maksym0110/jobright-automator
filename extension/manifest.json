@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Jobright Bot",
-  "version": "1.2.1",
-  "description": "Skips companies you've already applied to, clicks Apply with Autofill for new ones, returns to Jobright and confirms.",
-  "permissions": ["tabs", "storage", "sidePanel", "debugger"],
-  "host_permissions": ["https://jobright.ai/*", "https://*.supabase.co/*"],
+  "name": "Jobright Bot + Resume Builder",
+  "version": "2.0.0",
+  "description": "One click: walks the Jobright feed, reads each job description from the company's own page, marks it applied, and generates a matched CV, cover letter and Excel report.",
+  "permissions": ["tabs", "storage", "sidePanel", "debugger", "scripting", "downloads", "alarms"],
+  "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
@@ -19,7 +19,7 @@
       "run_at": "document_idle"
     }
   ],
-  "action": { "default_title": "Jobright Bot" },
+  "action": { "default_title": "Jobright Bot + Resume Builder" },
   "side_panel": { "default_path": "popup.html" },
   "options_page": "options.html"
 }

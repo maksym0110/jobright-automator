@@ -11,31 +11,81 @@ Both share the same selectors and rules. See **Extension** below, or skip to **N
 
 ## Extension
 
+One click does the whole loop: walk the Jobright feed → open each job on the **company's own site** → read the real job description there → mark it applied in Jobright → generate a matched CV and cover letter from your ai-resume-builder profile → save everything, plus `jobs.xlsx`, to your Downloads folder.
+
+A job whose description cannot be read is **skipped**: the tab is closed, Jobright's "Did you apply?" is answered *No*, and the row is recorded with the reason. A resume written from a guessed description is worse than no resume.
+
 ### Install (unpacked)
 1. Open `chrome://extensions` in the browser where you use Jobright (works in Octo Browser too).
-2. Enable **Developer mode** → **Load unpacked** → pick the [`extension/`](extension/) folder.
-3. Make sure the **Jobright Autofill** extension is also installed in that profile and you're logged in to Jobright.
+3. Enable **Developer mode** → **Load unpacked** → pick the [`extension/`](extension/) folder.
+4. Make sure the **Jobright Autofill** extension is also installed in that profile and you're logged in to Jobright.
+
+Chrome will ask for access to all sites — that is the JD scraper: the job page can be on any ATS (Greenhouse, Lever, Workday, Ashby, iCIMS, a hand-rolled careers page…), so it cannot be listed up front.
+
+If your API server runs in production, add this extension's ID (shown on `chrome://extensions`) to `CHROME_EXTENSION_IDS` on the server — otherwise its requests are rejected by CORS.
 
 ### Configure
 Click the extension icon → **Settings ⚙**. This page is the extension's `.env`:
 
-- **Run behaviour** — dry run, max applications per run, scroll rounds, delay, what to do with "APPLY NOW" cards.
+- **Run behaviour** — dry run, max applications per run, **minimum match score** (default 70%), scroll rounds, delay, what to do with "APPLY NOW" cards.
 - **Timeouts** — new tab, confirmation modal, continue/stop when no tab appears.
+- **Job description capture** — whether to read the JD, whether to skip jobs without one (recommended), skip LinkedIn *Easy Apply*, close the company tab, timeout and minimum length.
+- **Resume builder** — API URL, **Sign in** with your ai-resume-builder email and password (only the returned token is stored), document style (6 styles, Classic is the default), download folder, write `jobs.xlsx`, duplicate check via the app.
 - **Resume-builder history** — Supabase URL (pre-filled) + API key. Use the **anon** key from Supabase → Project Settings → API; if *Test connection* returns 401/permission denied, use the **service_role** key instead. *Sync now* pulls every company from `applications` + `interviews` into the extension's history; with *Sync before every run* on, that happens automatically.
 - **History** — count, add names manually, export JSON.
 
 ### Run
 Open Jobright's job list and click the icon — the control panel opens in Chrome's **side panel**, which stays open while the bot switches tabs (**↗ window** pops it out as its own window instead). **▶ Start** runs, **■ Stop** ends after the current job. Leave *Dry run* on for the first run, then turn it off with *Max applies* = 2.
 
-The log is short by default (**hide ▾ / show ▸** collapses it). Below it, **Applied this run** lists every job the bot applied to in the current run — role, company and salary (when the card shows one). In dry-run mode it lists the jobs it *would* have applied to.
+The style picker and the **CV + cover letter** switch are on the panel, so you don't need Settings to change them between runs. **This batch** lists every job handled in the run with its state — `queued`, `CV ready`, `failed`, `no JD` — and **Excel** / **Retry failed** rewrite the report or re-run the failures. Document generation runs in the background: it continues while the bot works through the feed, and while the panel is closed.
+
+Each run is one batch:
+
+```
+Downloads/Jobright-Automator/batch-2026-09-23-21-46/
+  1_Northwind_Labs/
+    Miguel_Mayori.pdf          the tailored CV
+    Miguel_Mayori.docx
+    Miguel_Mayori_cover.pdf    the cover letter
+    Miguel_Mayori_cover.docx
+  2_Cobalt_Systems/
+    …
+  jobs.xlsx                    No | Company Name | Role | JD link
+```
+
+One folder per company, numbered to match the report's **No** column, so a row points
+straight at its documents. The files are named after you (from your resume-builder profile) —
+that is the name a recruiter sees in their inbox. A job that was skipped or whose generation
+failed still gets a row and a number, but no folder.
 
 During a live run Chrome shows a bar saying *"Jobright Bot started debugging this browser"*. That's expected: Apply is clicked through the DevTools protocol so it counts as a real user gesture (a synthetic click would be stopped by Chrome's popup blocker and no company tab would open). The bar disappears when the run ends. Don't open DevTools on the Jobright tab during a run — only one debugger can attach.
 
+### Per job, in order
+1. **Reposted?** → ⊘ → *Already Applied*, next job.
+2. **Match score below the minimum?** (default 70%) → passed over before anything is clicked.
+   The card's score is read from the badge, falling back to the card's text. A card with no
+   score is processed and logged, because a renamed badge must not silently empty a run.
+3. **Company already applied?** — local history, then the app's own rule (same company within 30 days) → ⊘ → *Already Applied*, next job.
+4. **Which apply button?** *Apply with Autofill* and *EASY APPLY* are both clicked;
+   *APPLY NOW* is skipped unless you turn it on. Each is a separate setting.
+5. **The apply button is clicked**; if it opens a company tab, Jobright is refocused immediately.
+6. **The job description is read from that tab** — JSON-LD `JobPosting` first, then known ATS containers, then the densest text block, then the body around the first "Responsibilities / Requirements"-style marker. Every frame is tried, so an ATS iframe works, and it retries while the page hydrates.
+   **If no tab opened** — which is what EASY APPLY does when it submits inside Jobright — or
+   if the employer's page could not be read, the description is taken from Jobright's own
+   detail pane instead, and the report records it as coming from there.
+7. **No description, or LinkedIn Easy Apply** → tab closed, "Did you apply?" answered **No**, row recorded as skipped, next job.
+8. **Description captured** → "Yes, I applied!" is clicked (so Jobright drops the card), the company goes into the history, and the job is queued. The company tab is then closed by default — the bot does not fill in the company's own form, so submit the application yourself with the generated CV, from the JD link in the report. Turn *Close the company tab* off to keep every tab open instead.
+9. **The queue** (background) posts the JD to `POST /api/cv/generate`, downloads resume + cover letter as PDF and DOCX, and fills in the row.
+9. When the run ends and the queue is empty, `jobs.xlsx` is written.
+
 ### How it works
-- `content.js` runs inside jobright.ai: reads cards, clicks Apply, waits for "Did you apply?", clicks "Yes, I applied!", records the company.
-- `background.js` owns the tabs and debugger APIs: sends the real Apply click; while a click is "armed", any new tab is recorded as the external company tab and the Jobright tab is **immediately refocused**. The external tab is never touched.
+- `content.js` runs inside jobright.ai: reads cards, clicks Apply, gates on the JD, answers the confirmation modal, queues the job.
+- `background.js` owns tabs, the debugger and the scripting APIs: sends the real Apply click; while a click is "armed", any new tab is recorded as the company tab and Jobright is **immediately refocused**; then it injects `jd-scraper.js` into that tab (all frames) and closes it.
+- `jd-scraper.js` is the only file that knows how job pages are shaped. Tune it there.
+- `generator.js` is the document queue: one job at a time, downloads through `chrome.downloads`, keeps itself alive with an alarm, and survives the panel closing or the worker being recycled.
+- `xlsx-writer.js` writes a real `.xlsx` (bold frozen header, column widths, autofilter, clickable links) with no dependencies, because a service worker cannot load a spreadsheet library.
 - `page-bridge.js` runs in the page world and, only while the bot is running, catches a `window.open` that Chrome blocked and hands the URL to the extension to open (inactive) instead.
-- `chrome.storage.local` holds settings, history and the log — all private to that browser profile.
+- `chrome.storage.local` holds settings, history, the batch rows and the log — all private to that browser profile.
 
 ## Node bot
 
@@ -71,7 +121,7 @@ bot uses its own Chrome profile (`./browser-profile/`), so the extension must be
 installed *in that profile* once:
 
 1. `npm run login` — the bot's Chrome window opens.
-2. In that window, click **"2. Enable Autofill Extension"** on the Jobright page
+3. In that window, click **"2. Enable Autofill Extension"** on the Jobright page
    (or open the Chrome Web Store and search "Jobright Autofill") and install it.
 3. Press Enter in the terminal. The extension is now part of the profile.
 
