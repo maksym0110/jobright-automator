@@ -151,8 +151,8 @@ async function scrapeJdFromTab(tabId, settings) {
 const LINKEDIN_JOB_RE = /linkedin\.com\/(?:jobs|job)\//i;
 
 /**
- * Read the JD from the company tab, then close it — the JD link is kept in the
- * report, so twenty open tabs buy nothing. "Easy Apply" postings are rejected
+ * Read the JD from the company tab. The tab stays open (so you can apply there)
+ * unless "Close the company tab" is on. "Easy Apply" postings are rejected
  * here, before anything gets marked as applied.
  */
 async function captureJd(tabId, settings) {

@@ -74,7 +74,7 @@ During a live run Chrome shows a bar saying *"Jobright Bot started debugging thi
    if the employer's page could not be read, the description is taken from Jobright's own
    detail pane instead, and the report records it as coming from there.
 7. **No description, or LinkedIn Easy Apply** → tab closed, "Did you apply?" answered **No**, row recorded as skipped, next job.
-8. **Description captured** → "Yes, I applied!" is clicked (so Jobright drops the card), the company goes into the history, and the job is queued. The company tab is then closed by default — the bot does not fill in the company's own form, so submit the application yourself with the generated CV, from the JD link in the report. Turn *Close the company tab* off to keep every tab open instead.
+8. **Description captured** → "Yes, I applied!" is clicked (so Jobright drops the card), the company goes into the history, and the job is queued. The company tab stays open (as in v1) — the bot does not fill in the company's own form, so submit the application there yourself with the generated CV. Untick *Keep job tabs open* on the panel to close each tab once its description is read.
 9. **The queue** (background) posts the JD to `POST /api/cv/generate`, downloads resume + cover letter as PDF and DOCX, and fills in the row.
 9. When the run ends and the queue is empty, `jobs.xlsx` is written.
 

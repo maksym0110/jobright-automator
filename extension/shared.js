@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS = {
   jdTimeout: 30000, // ms to wait for the company page to render a description
   jdMinLength: 400, // anything shorter is not a real description
   skipEasyApply: true, // skip LinkedIn "Easy Apply" postings
-  closeExternalTabs: true, // close the company tab once the JD is captured
+  closeExternalTabs: false, // false = every job opens in its own tab and stays open (as in v1)
   jobrightDetailFallback: true, // no company tab (EASY APPLY) -> read Jobright's own pane
 
   /* ---- Matched CV + cover letter (ai-resume-builder API) ---- */
@@ -70,6 +70,13 @@ function prettyCompanyName(name) {
 
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
+  // One-time: 2.0.0 saved "close the company tab" as on. Job tabs stay open by
+  // default again (as in v1), so reset that once; later choices are kept.
+  if (settings && !settings.keepTabsMigrated) {
+    settings.closeExternalTabs = false;
+    settings.keepTabsMigrated = true;
+    await chrome.storage.local.set({ settings });
+  }
   return { ...DEFAULT_SETTINGS, ...(settings || {}) };
 }
 

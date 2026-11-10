@@ -16,6 +16,7 @@ async function render() {
   $("minMatchScore").value = settings.minMatchScore ?? 70;
   $("generateDocuments").checked = !!settings.generateDocuments;
   $("template").value = settings.template || "classic";
+  $("keepTabs").checked = !settings.closeExternalTabs;
   $("historyCount").textContent = `History: ${Object.keys(history).length} companies`;
   $("apiUser").textContent = apiUser && apiUser.email ? `as ${apiUser.email}` : "not signed in";
   $("apiUser").style.opacity = apiUser && apiUser.email ? ".7" : "1";
@@ -189,6 +190,7 @@ $("minMatchScore").addEventListener("change", (e) =>
 );
 $("generateDocuments").addEventListener("change", (e) => saveSettings({ generateDocuments: e.target.checked }));
 $("template").addEventListener("change", (e) => saveSettings({ template: e.target.value }));
+$("keepTabs").addEventListener("change", (e) => saveSettings({ closeExternalTabs: !e.target.checked }));
 
 $("excelBtn").addEventListener("click", async () => {
   const res = await send({ type: "writeExcelNow" });
